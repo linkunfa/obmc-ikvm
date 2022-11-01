@@ -37,8 +37,6 @@ Server::Server(const Args& args, Input& i, Video& v) :
     framebuffer.resize(
         video.getHeight() * video.getWidth() * Video::bytesPerPixel, 0);
 
-    rfbNuInitRfbFormat(server);
-
     server->screenData = this;
     server->desktopName = "OpenBMC IKVM";
     server->frameBuffer = framebuffer.data();
@@ -247,7 +245,6 @@ enum rfbNewClientAction Server::newClient(rfbClientPtr cl)
         new ClientData(server->video.getFrameRate(), &server->input);
     cl->clientGoneHook = clientGone;
     cl->clientFramebufferUpdateRequestHook = clientFramebufferUpdateRequest;
-    cl->preferredEncoding = rfbEncodingHextile;
 
     server->video.setCompareMode(false);
     server->compareModeCounter = FULL_FRAME_COUNT;
@@ -262,18 +259,6 @@ enum rfbNewClientAction Server::newClient(rfbClientPtr cl)
     return RFB_CLIENT_ACCEPT;
 }
 
-void Server::rfbNuInitRfbFormat(rfbScreenInfoPtr screen)
-{
-    rfbPixelFormat *format = &screen->serverFormat;
-
-    format->redMax = 31;
-    format->greenMax = 63;
-    format->blueMax = 31;
-    format->redShift = 11;
-    format->greenShift = 5;
-    format->blueShift = 0;
-}
-
 void Server::doResize()
 {
     rfbClientIteratorPtr it;
@@ -285,8 +270,6 @@ void Server::doResize()
     rfbNewFramebuffer(server, framebuffer.data(), video.getWidth(),
                       video.getHeight(), Video::bitsPerSample,
                       Video::samplesPerPixel, Video::bytesPerPixel);
-
-    rfbNuInitRfbFormat(server);
 
     rfbMarkRectAsModified(server, 0, 0, video.getWidth(), video.getHeight());
 

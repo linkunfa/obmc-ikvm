@@ -22,9 +22,9 @@
 namespace ikvm
 {
 
-const int Video::bitsPerSample(5);
-const int Video::bytesPerPixel(2);
-const int Video::samplesPerPixel(1);
+const int Video::bitsPerSample(8);
+const int Video::bytesPerPixel(4);
+const int Video::samplesPerPixel(3);
 
 using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Common::File::Error;
