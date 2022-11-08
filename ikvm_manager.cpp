@@ -7,7 +7,7 @@ namespace ikvm
 
 Manager::Manager(const Args& args) :
     continueExecuting(true), serverDone(false), videoDone(true),
-    input(args.getKeyboardPath(), args.getPointerPath()),
+    input(args.getKeyboardPath(), args.getPointerPath(), args.getUdcName()),
     video(args.getVideoPath(), input, args.getFrameRate(),
           args.getSubsampling()),
     server(args, input, video)
@@ -22,6 +22,7 @@ void Manager::run()
         if (server.wantsFrame())
         {
             video.start();
+            video.getFrame();
             server.sendFrame();
         }
         else

@@ -23,14 +23,14 @@ namespace ikvm
 using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Common::File::Error;
 
-Input::Input(const std::string& kbdPath, const std::string& ptrPath) :
-    keyboardFd(-1), pointerFd(-1), keyboardReport{0}, pointerReport{0},
-    keyboardPath(kbdPath), pointerPath(ptrPath)
+Input::Input(const std::string& kbdPath, const std::string& ptrPath,
+             const std::string& udc) :
+    keyboardFd(-1),
+    pointerFd(-1), keyboardReport{0}, pointerReport{0}, keyboardPath(kbdPath),
+    pointerPath(ptrPath), udcName(udc)
 {
-#if 0
     hidUdcStream.exceptions(std::ofstream::failbit | std::ofstream::badbit);
     hidUdcStream.open(hidUdcPath, std::ios::out | std::ios::app);
-#endif
 }
 
 Input::~Input()
@@ -51,17 +51,24 @@ Input::~Input()
 
 void Input::connect()
 {
-#if 0
     try
     {
-        for (const auto& port : fs::directory_iterator(usbVirtualHubPath))
+        if (udcName.empty())
         {
-            if (fs::is_directory(port) && !fs::is_symlink(port))
+            for (const auto& port : fs::directory_iterator(usbVirtualHubPath))
             {
-                const std::string portId = port.path().filename();
-                hidUdcStream << portId << std::endl;
-                break;
+                if (fs::is_directory(port) && !fs::is_symlink(port) &&
+                    !fs::exists(port.path() / "gadget/suspended"))
+                {
+                    const std::string portId = port.path().filename();
+                    hidUdcStream << portId << std::endl;
+                    break;
+                }
             }
+        }
+        else // If UDC has been specified by '-u' parameter, connect to it.
+        {
+            hidUdcStream << udcName << std::endl;
         }
     }
     catch (fs::filesystem_error& e)
@@ -76,7 +83,7 @@ void Input::connect()
                         entry("ERROR=%s", e.what()));
         return;
     }
-#endif
+
     if (!keyboardPath.empty())
     {
         keyboardFd =
@@ -120,7 +127,7 @@ void Input::disconnect()
         close(pointerFd);
         pointerFd = -1;
     }
-#if 0
+
     try
     {
         hidUdcStream << "" << std::endl;
@@ -130,7 +137,6 @@ void Input::disconnect()
         log<level::ERR>("Failed to disconnect HID gadget",
                         entry("ERROR=%s", e.what()));
     }
-#endif
 }
 
 void Input::keyEvent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
@@ -209,19 +215,6 @@ void Input::pointerEvent(int buttonMask, int x, int y, rfbClientPtr cl)
     Input* input = cd->input;
     Server* server = (Server*)cl->screen->screenData;
     const Video& video = server->getVideo();
-    rfbClientIteratorPtr it;
-    rfbClientPtr clientPtr;
-    rfbScreenInfoPtr screenPtr = cl->screen;
-
-     // sync cursor position for each client to prevent server
-     // from updating cursor by rfbSendRectEncodingHextile
-    it = rfbGetClientIterator(screenPtr);
-    while ((clientPtr = rfbClientIteratorNext(it)))
-    {
-        clientPtr->screen->cursorX = clientPtr->cursorX = x;
-        clientPtr->screen->cursorY = clientPtr->cursorY = y;
-    }
-    rfbReleaseClientIterator(it);
 
     if (input->pointerFd < 0)
     {

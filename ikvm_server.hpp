@@ -86,8 +86,6 @@ class Server
         return video;
     }
 
-    void dumpFps();
-
   private:
     /*
      * @brief Handler for a client frame update message
@@ -113,6 +111,7 @@ class Server
 
     /* @brief Performs the resize operation on the framebuffer */
     void doResize();
+
     /* @brief Boolean to indicate if a resize operation is on-going */
     bool pendingResize;
     /* @brief Number of frames handled since a client connected */
@@ -129,6 +128,8 @@ class Server
     Video& video;
     /* @brief Default framebuffer storage */
     std::vector<char> framebuffer;
+    /* @brief Identical frames detection */
+    bool calcFrameCRC;
     /* @brief Cursor bitmap width */
     static constexpr int cursorWidth = 20;
     /* @brief Cursor bitmap height */
@@ -175,19 +176,6 @@ class Server
                                          " o    oxxxo         "
                                          "       oxo          "
                                          "        o           ";
-
-    static constexpr int FULL_FRAME_COUNT = 5;
-    int compareModeCounter;
-
-    /* Dump FPS every 10 seconds */
-    static constexpr int FPS_DUMP_RATE = 10;
-    unsigned int fpsCounter;
-    timespec start;
-
-    rfbBool rfbSendCompressedDataHextile(rfbClientPtr cl, char *buf,
-                                    int compressedLen);
-
-    void rfbNuInitRfbFormat(rfbScreenInfoPtr screen);
 };
 
 } // namespace ikvm

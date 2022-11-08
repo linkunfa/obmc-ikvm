@@ -112,11 +112,6 @@ class Video
         subSampling = _sub;
     }
 
-    unsigned int getClip(unsigned int *x, unsigned int *y, unsigned int *w,
-                         unsigned int *h);
-
-    void setCompareMode(bool enable);
-
     /* @brief Number of bits per component of a pixel */
     static const int bitsPerSample;
     /* @brief Number of bytes of storage for a pixel */

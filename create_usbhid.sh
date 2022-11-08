@@ -1,7 +1,7 @@
 #!/bin/sh
 
 hid_conf_directory="/sys/kernel/config/usb_gadget/obmc_hid"
-dev_name="f0830000.udc"
+dev_name="1e6a0000.usb-vhub"
 
 create_hid() {
     # create gadget
@@ -125,7 +125,19 @@ create_hid() {
 }
 
 connect_hid() {
-     echo "${dev_name}" > UDC
+    if ! [[ `cat UDC` =~ "${dev_name}:p" ]]; then
+        i=0
+        num_ports=5
+        base_usb_dir="/sys/bus/platform/devices/${dev_name}/${dev_name}:p"
+        while [ $i -lt $num_ports ]; do
+            port=$(($i + 1))
+            i=$port
+            if [ ! -e "${base_usb_dir}${port}/gadget/suspended" ]; then
+                break
+            fi
+        done
+        echo "${dev_name}:p${port}" > UDC
+    fi
 }
 
 disconnect_hid() {

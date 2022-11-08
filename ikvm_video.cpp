@@ -22,9 +22,9 @@
 namespace ikvm
 {
 
-const int Video::bitsPerSample(5);
-const int Video::bytesPerPixel(2);
-const int Video::samplesPerPixel(1);
+const int Video::bitsPerSample(8);
+const int Video::bytesPerPixel(4);
+const int Video::samplesPerPixel(3);
 
 using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Common::File::Error;
@@ -39,59 +39,6 @@ Video::Video(const std::string& p, Input& input, int fr, int sub) :
 Video::~Video()
 {
     stop();
-}
-
-void Video::setCompareMode(bool enable)
-{
-    int rc(0);
-    v4l2_control control;
-
-    if (fd < 0)
-    {
-        return;
-    }
-
-    control.value = enable ? V4L2_DETECT_MD_MODE_REGION_GRID :
-                    V4L2_DETECT_MD_MODE_GLOBAL;
-    control.id = V4L2_CID_DETECT_MD_MODE;
-
-    rc = ioctl(fd, VIDIOC_S_CTRL, &control);
-    if (rc < 0)
-    {
-        log<level::ERR>("Failed to set control",
-            entry("ERROR=%s", strerror(errno)));
-    }
-}
-
-unsigned int Video::getClip(unsigned int *x, unsigned int *y, unsigned int *w,
-                            unsigned int *h)
-{
-    int rc(0);
-    v4l2_format fmt;
-    v4l2_window *win;
-
-    if (fd < 0)
-    {
-        return 0;
-    }
-
-    fmt.type = V4L2_BUF_TYPE_VIDEO_OVERLAY;
-    rc = ioctl(fd, VIDIOC_G_FMT, &fmt);
-    if (rc < 0)
-    {
-        log<level::ERR>("Failed to get clip count",
-            entry("ERROR=%s", strerror(errno)));
-
-        return 0;
-    }
-
-    win = &fmt.fmt.win;
-    memcpy(x, &win->w.left, sizeof(unsigned int));
-    memcpy(y, &win->w.top, sizeof(unsigned int));
-    memcpy(w, &win->w.width, sizeof(unsigned int));
-    memcpy(h, &win->w.height, sizeof(unsigned int));
-
-    return win->clipcount;
 }
 
 char* Video::getData()
@@ -212,6 +159,7 @@ bool Video::needsResize()
                             entry("ERROR=%s", strerror(errno)));
             timingsError = true;
         }
+
         restart();
         return false;
     }
