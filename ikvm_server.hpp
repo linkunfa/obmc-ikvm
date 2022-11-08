@@ -66,6 +66,8 @@ class Server
     void run();
     /* @brief Sends pending video frame to clients */
     void sendFrame();
+    /* @brief Sends pending Hextile encoded video frame to clients */
+    void sendHextileFrame();
 
     /*
      * @brief Indicates whether or not video data is desired
@@ -176,6 +178,12 @@ class Server
                                          " o    oxxxo         "
                                          "       oxo          "
                                          "        o           ";
+
+    static constexpr int COMPLETE_FRAME_COUNT = 5;
+    int captureModeCounter;
+
+    rfbBool rfbSendCompressedDataHextile(rfbClientPtr cl, char *buf,
+                                    int compressedLen);
 };
 
 } // namespace ikvm

@@ -111,6 +111,28 @@ class Video
     {
         subSampling = _sub;
     }
+    /*
+     * @brief Gets whether or not the pixel format of the video frame is JPEG
+     *
+     * @return Boolean indicating if the pixel format of the frame is JPEG
+     */
+    inline const int isJpegFormat() const
+    {
+        return pixelFormat == 0x4745504A; // JPEG Four-character-code
+    }
+    /*
+     * @brief Gets whether or not the pixel format of the video frame is HEXTILE
+     *
+     * @return Boolean indicating if the pixel format of the frame is HEXTILE
+     */
+    inline const bool isHextileFormat() const
+    {
+        return pixelFormat == 0x4C545848; // HXTL Four-character-code
+    }
+
+    unsigned int getClipCount();
+
+    void setCaptureMode(bool completeFrame);
 
     /* @brief Number of bits per component of a pixel */
     static const int bitsPerSample;
@@ -164,6 +186,8 @@ class Video
     Input& input;
     /* @brief Path to the V4L2 video device */
     const std::string path;
+    /* @brief Pixel format Four-character-code of the video frame */
+    int pixelFormat;
     /* @brief Streaming buffer storage */
     std::vector<Buffer> buffers;
 };

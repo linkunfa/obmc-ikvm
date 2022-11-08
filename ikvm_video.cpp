@@ -41,6 +41,53 @@ Video::~Video()
     stop();
 }
 
+void Video::setCaptureMode(bool completeFrame)
+{
+    int rc(0);
+    v4l2_control control;
+
+    if (fd < 0)
+    {
+        return;
+    }
+
+    control.value = completeFrame ? V4L2_DETECT_MD_MODE_GLOBAL :
+                    V4L2_DETECT_MD_MODE_REGION_GRID;
+    control.id = V4L2_CID_DETECT_MD_MODE;
+
+    rc = ioctl(fd, VIDIOC_S_CTRL, &control);
+    if (rc < 0)
+    {
+        log<level::ERR>("Failed to set control",
+            entry("ERROR=%s", strerror(errno)));
+    }
+}
+
+unsigned int Video::getClipCount()
+{
+    int rc(0);
+    v4l2_format fmt;
+    v4l2_window *win;
+
+    if (fd < 0)
+    {
+        return 0;
+    }
+
+    fmt.type = V4L2_BUF_TYPE_VIDEO_OVERLAY;
+    rc = ioctl(fd, VIDIOC_G_FMT, &fmt);
+    if (rc < 0)
+    {
+        log<level::ERR>("Failed to get clip count",
+            entry("ERROR=%s", strerror(errno)));
+
+        return 0;
+    }
+
+    win = &fmt.fmt.win;
+    return win->clipcount;
+}
+
 char* Video::getData()
 {
     if (lastFrameIndex >= 0)
@@ -433,6 +480,8 @@ void Video::start()
             xyz::openbmc_project::Common::Device::ReadFailure::
                 CALLOUT_DEVICE_PATH(path.c_str()));
     }
+
+    pixelFormat = fmt.fmt.pix.pixelformat;
 
     memset(&sparm, 0, sizeof(v4l2_streamparm));
     sparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;

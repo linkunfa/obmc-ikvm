@@ -215,6 +215,9 @@ void Input::pointerEvent(int buttonMask, int x, int y, rfbClientPtr cl)
     Input* input = cd->input;
     Server* server = (Server*)cl->screen->screenData;
     const Video& video = server->getVideo();
+    rfbClientIteratorPtr it;
+    rfbClientPtr clientPtr;
+    rfbScreenInfoPtr screenPtr = cl->screen;
 
     if (input->pointerFd < 0)
     {
@@ -257,6 +260,19 @@ void Input::pointerEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 
     rfbDefaultPtrAddEvent(buttonMask, x, y, cl);
     input->writePointer(input->pointerReport);
+
+    if(video.isHextileFormat())
+    {
+        // sync cursor position for each client to prevent server
+        // from updating cursor by rfbSendRectEncodingHextile
+        it = rfbGetClientIterator(screenPtr);
+        while ((clientPtr = rfbClientIteratorNext(it)))
+        {
+            clientPtr->screen->cursorX = clientPtr->cursorX = x;
+            clientPtr->screen->cursorY = clientPtr->cursorY = y;
+        }
+        rfbReleaseClientIterator(it);
+    }
 }
 
 void Input::sendWakeupPacket()

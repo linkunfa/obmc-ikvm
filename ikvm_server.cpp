@@ -15,7 +15,8 @@ using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Common::Error;
 
 Server::Server(const Args& args, Input& i, Video& v) :
-    pendingResize(false), frameCounter(0), numClients(0), input(i), video(v)
+    pendingResize(false), frameCounter(0), numClients(0), input(i), video(v),
+    captureModeCounter(COMPLETE_FRAME_COUNT)
 {
     std::string ip("localhost");
     const Args::CommandLine& commandLine = args.getCommandLine();
@@ -177,6 +178,97 @@ void Server::sendFrame()
     rfbReleaseClientIterator(it);
 }
 
+void Server::sendHextileFrame()
+{
+    char* data = nullptr;
+    rfbClientIteratorPtr it;
+    rfbClientPtr cl;
+    bool anyClientNeedUpdate = false;
+    bool anyClientSkipFrame = false;
+    unsigned int clipCount;
+
+    if (pendingResize)
+    {
+        return;
+    }
+
+    it = rfbGetClientIterator(server);
+
+    while ((cl = rfbClientIteratorNext(it)))
+    {
+        ClientData* cd = (ClientData*)cl->clientData;
+
+        if (!cd)
+            continue;
+
+        if (cd->skipFrame)
+        {
+            cd->skipFrame--;
+            anyClientSkipFrame = true;
+            continue;
+        }
+
+        if (cd->needUpdate)
+            anyClientNeedUpdate = true;
+    }
+
+    rfbReleaseClientIterator(it);
+
+    if (!anyClientSkipFrame && anyClientNeedUpdate)
+    {
+        video.getFrame();
+        data = video.getData();
+
+        if (!data)
+            return;
+
+        if (captureModeCounter && --captureModeCounter == 0)
+        {
+            video.setCaptureMode(false);
+        }
+
+        clipCount = video.getClipCount();
+
+        if (!clipCount)
+            return;
+
+        // video.getFrame() may get the differences compared with last frame
+        // so that all clients need to be updated simultaneously for synchronization
+        it = rfbGetClientIterator(server);
+        while ((cl = rfbClientIteratorNext(it)))
+        {
+            ClientData* cd = (ClientData*)cl->clientData;
+            rfbFramebufferUpdateMsg* fu = (rfbFramebufferUpdateMsg*)cl->updateBuf;
+
+            cd->needUpdate = false;
+
+            if (cl->enableLastRectEncoding)
+            {
+                fu->nRects = 0xFFFF;
+            }
+            else
+            {
+                fu->nRects = Swap16IfLE(clipCount);
+            }
+
+            fu->type = rfbFramebufferUpdate;
+            cl->ublen = sz_rfbFramebufferUpdateMsg;
+            rfbSendUpdateBuf(cl);
+
+            rfbSendCompressedDataHextile(cl, data, video.getFrameSize());
+
+            if (cl->enableLastRectEncoding)
+            {
+                rfbSendLastRectMarker(cl);
+            }
+
+            rfbSendUpdateBuf(cl);
+        }
+
+        rfbReleaseClientIterator(it);
+    }
+}
+
 void Server::clientFramebufferUpdateRequest(
     rfbClientPtr cl, rfbFramebufferUpdateRequestMsg* furMsg)
 {
@@ -221,6 +313,12 @@ enum rfbNewClientAction Server::newClient(rfbClientPtr cl)
         server->frameCounter = 0;
     }
 
+    if(server->video.isHextileFormat())
+    {
+        server->video.setCaptureMode(true);
+        server->captureModeCounter = COMPLETE_FRAME_COUNT;
+    }
+
     return RFB_CLIENT_ACCEPT;
 }
 
@@ -253,6 +351,27 @@ void Server::doResize()
     }
 
     rfbReleaseClientIterator(it);
+}
+
+rfbBool Server::rfbSendCompressedDataHextile(rfbClientPtr cl, char *buf,
+                                             int compressedLen)
+{
+    int i, portionLen;
+    portionLen = UPDATE_BUF_SIZE;
+
+    for (i = 0; i < compressedLen; i += portionLen) {
+        if (i + portionLen > compressedLen) {
+            portionLen = compressedLen - i;
+        }
+        if (cl->ublen + portionLen > UPDATE_BUF_SIZE) {
+            if (!rfbSendUpdateBuf(cl))
+                return FALSE;
+        }
+        memcpy(&cl->updateBuf[cl->ublen], &buf[i], portionLen);
+        cl->ublen += portionLen;
+    }
+
+    return TRUE;
 }
 
 } // namespace ikvm

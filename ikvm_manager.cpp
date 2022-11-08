@@ -22,8 +22,16 @@ void Manager::run()
         if (server.wantsFrame())
         {
             video.start();
-            video.getFrame();
-            server.sendFrame();
+
+            if(video.isJpegFormat())
+            {
+                video.getFrame();
+                server.sendFrame();
+            }
+            else if(video.isHextileFormat())
+            {
+                server.sendHextileFrame();
+            }
         }
         else
         {
