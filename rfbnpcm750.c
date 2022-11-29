@@ -319,7 +319,7 @@ static int rfbNuInitVCD(struct nu_rfb *nurfb, int first)
 
 	rfbNuClearHextieDataOffset(nurfb);
 
-	cmd.framebuf = vcd_info->vcd_fb;
+	cmd.framebuf = vcd_info->vcd_fb[0];
 	if (ioctl(nurfb->hextile_fd, ECE_IOCSETFB, &cmd) < 0)
 	{
 		rfbErr("hextile set fb address failed\n");
@@ -390,8 +390,11 @@ error:
 static int rfbNuGetUpdate(rfbClientRec *cl)
 {
 	struct nu_rfb *nurfb = (struct nu_rfb *)cl->clientData;
+	struct vcd_info *vcd_info = &nurfb->vcd_info;
+	struct ece_ioctl_cmd cmd;
 	int index = cl->sock - nurfb->sock_start;
 	int ret;
+	uint32_t tmp;
 
 	ret = rfbNuChkVCDRes(nurfb, cl);
 	if (ret != 0)
@@ -439,8 +442,50 @@ static int rfbNuGetUpdate(rfbClientRec *cl)
 	else
 	{
 		if (nurfb->do_cmd) {
-			if (rfbNuSetVCDCmd(nurfb, COMPARE) < 0)
-				return -1;
+			if(vcd_info->vcd_fb[1]) { // use "compare 2 frames" mode if frame buffer 2 has set in DT
+				// switch frame buffer 1 (FB_A) and frame buffer 2 (FB_B)
+				tmp = vcd_info->vcd_fb[0];
+				vcd_info->vcd_fb[0] = vcd_info->vcd_fb[1];
+				vcd_info->vcd_fb[1] = tmp;
+
+				// set to VCD/ECE after switching
+				if (ioctl(nurfb->raw_fb_fd, VCD_IOCSETFBA, &vcd_info->vcd_fb[0]) < 0)
+				{
+					rfbErr("Failed to set VCD_FBA\n");
+					return -1;
+				}
+
+				if (ioctl(nurfb->raw_fb_fd, VCD_IOCSETFBB, &vcd_info->vcd_fb[1]) < 0)
+				{
+					rfbErr("Failed to set VCD_FBB\n");
+					return -1;
+				}
+
+				cmd.framebuf = vcd_info->vcd_fb[0];
+				if (ioctl(nurfb->hextile_fd, ECE_IOCSETFB, &cmd) < 0)
+				{
+					rfbErr("Failed to set ECE_FB\n");
+					return -1;
+				}
+
+				// capture frame on FB_A
+				if (rfbNuSetVCDCmd(nurfb, CAPTURE_FRAME) < 0)
+				{
+					rfbErr("Failed to capture frame\n");
+					return -1;
+				}
+
+				// compare frames on FB_A and FB_B
+				if (rfbNuSetVCDCmd(nurfb, CAPTURE_TWO_FRAMES) < 0)
+				{
+					rfbErr("Failed to compare 2 frames\n");
+					return -1;
+				}
+			}
+			else {
+				if (rfbNuSetVCDCmd(nurfb, COMPARE) < 0)
+					return -1;
+			}
 		}
 		return rfbNuGetDiffCnt(cl);
 	}
