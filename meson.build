@@ -35,8 +35,8 @@ endif
 configure_file(output : 'config.h', configuration : conf_data)
 
 configure_file(
-    input: 'start-ipkvm.service',
-    output: 'start-ipkvm.service',
+    input: 'obmc-ikvm.service',
+    output: 'obmc-ikvm.service',
     copy: true,
     install_dir:
         dependency('systemd').get_pkgconfig_variable(
